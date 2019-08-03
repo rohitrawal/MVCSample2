@@ -1,0 +1,131 @@
+Install Entity Framework
+----------
+public class Employee
+    {
+        // Scalar Properties
+        public int Id { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public string Gender { get; set; }
+        public int Salary { get; set; }
+
+        // Navigation Property
+        public Department Department { get; set; }
+    }
+-----------
+ public class Department
+    {
+        // Scalar Properties
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public string Location { get; set; }
+
+        // Navigation Property
+        public List<Employee> Employees { get; set; }
+    }
+------------
+ public class EmployeeDBContext : DbContext
+    {
+        public DbSet<Department> Departments { get; set; }
+        public DbSet<Employee> Employees { get; set; }
+    }
+------------
+ public class EmployeeRepository
+    {
+        public List<Department> GetDepartments()
+        {
+            EmployeeDBContext employeeDBContext = new EmployeeDBContext();
+            return employeeDBContext.Departments.Include("Employees").ToList();
+        }
+    }
+------------
+<add name="EmployeeDBContext"
+   connectionString="Data Source=ALIPL0666;Integrated Security=True;Initial Catalog=Sample;"
+   providerName="System.Data.SqlClient"
+/>	
+------------------
+Create controller with Employee and Department Model
+Department to Employee (1 to Many)
+-----------------
+Not for MVC	
+Add Global.asax File
+Add below code in Application_Start() method
+Database.SetInitializer(new DropCreateDatabaseIfModelChanges<EmployeeDBContext>());
+Database.SetInitializer(new DropCreateDatabaseAlways<EmployeeDBContext>());
+---------------------
+Used Stored Procedure in Entity Framework
+EmployeeDBContext:
+ protected override void OnModelCreating(DbModelBuilder modelBuilder)
+        {
+            // This line will tell entity framework to use stored procedures
+            // when inserting, updating and deleting Employees
+            modelBuilder.Entity<Employee>().MapToStoredProcedures();
+            base.OnModelCreating(modelBuilder);
+        }
+
+Employee Repository:
+public List<Employee> GetEmployees()
+        {
+            return employeeDBContext.Employees.ToList();
+        }
+
+        public void InsertEmployee(Employee employee)
+        {
+            employeeDBContext.Employees.Add(employee);
+            employeeDBContext.SaveChanges();
+        }
+
+        public void UpdateEmployee(Employee employee)
+        {
+            Employee employeeToUpdate = employeeDBContext
+                .Employees.SingleOrDefault(x => x.Id == employee.Id);
+            employeeToUpdate.Name = employee.Name;
+            employeeToUpdate.Gender = employee.Gender;
+            employeeToUpdate.Salary = employee.Salary;
+            employeeDBContext.SaveChanges();
+        }
+
+        public void DeleteEmployee(Employee employee)
+        {
+            Employee employeeToDelete = employeeDBContext
+                .Employees.SingleOrDefault(x => x.Id == employee.Id);
+            employeeDBContext.Employees.Remove(employeeToDelete);
+            employeeDBContext.SaveChanges();
+        }
+		
+----------------		
+Change the default name of stored procedures
+ protected override void OnModelCreating(DbModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Employee>()
+            .MapToStoredProcedures(p => p.Insert(x => x.HasName("InsertEmployee")));
+        modelBuilder.Entity<Employee>()
+            .MapToStoredProcedures(p => p.Update(x => x.HasName("UpdateEmployee")));
+        modelBuilder.Entity<Employee>()
+            .MapToStoredProcedures(p => p.Delete(x => x.HasName("DeleteEmployee")));
+
+        base.OnModelCreating(modelBuilder);
+    }
+----------------------------	
+Paging:
+Install PagedList.Mvc
+Add below code in controller:
+using PagedList.Mvc;
+using PagedList;
+Controller--
+public ActionResult Index(string searchBy, string search, int? page)
+{
+    if (searchBy == "Gender")
+    {
+        return View(db.Employees.Where(x => x.Gender == search || search == null).ToList().ToPagedList(page ?? 1, 3));
+    }
+    else
+    {
+        return View(db.Employees.Where(x => x.Name.StartsWith(search) || search == null).ToList().ToPagedList(page ?? 1, 3));
+    }
+}
+View--
+@model IPagedList<MVCDemo.Models.Employee>
+@using PagedList.Mvc;
+@using PagedList;
+-----------------------------
